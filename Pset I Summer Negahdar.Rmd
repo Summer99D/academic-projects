@@ -1,0 +1,194 @@
+---
+title: "PSET 1 program evaluation"
+author: "Summer Negahdar(done together with Martha McLaren)"
+date: "2024-04-01"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Q1:
+potential outcome framework includes all the possible outcomes we could have observed, 
+The impact of treatment for farmer $i$ can be described as:
+
+$\text{Impact of treatment for farmer } i = Y_i(1) - Y_i(0)$
+
+$\text{Impact of treatment for farmer } i = Y_i(receiving.the.seeds) - Y_i(not.receiving.the.seeds)$
+
+this means what would have happened to one farmer (farmer i) if he was given the treatment vs what would be the outcome for him if he does not receive the treatment. measuring the impact for farmer i then would be the difference between the crop they have yielded after receiving the seeds and their crop production in the absence of drought-resistant seeds. this represents the impact of providing farmer i with drought-resistant seeds. 
+
+
+Q2:
+the reason is that we cannot observe the coutnerfactual of treatment on treated farmers. in simple, easy-to-understand words, we can never measure what would families be like if they had received the seeds AND they had not at the same time. at one certain point in time, and in one specific household we can only decide to observe the outcome of them receiving the seeds OR not receiving the seeds. 
+we can still estimate the $\tau$
+
+Q3:
+ $\hat \tau^{NAIVE}=\bar Y_i(1) - \bar Y_i(0)$
+what they are suggesting to do is the ATE(average treatment effect) which is the difference between the mean of treated units and mean of non-treated units. however for two specific reasons this might not be the actual ATE. the concerns are what taint the validity of our trial-research. 
+the first example might be the non-compliance issue, where those who have been assigned to treatment or control group do not comply with their assignment(i.e. treated units do not plant the seeds or controlled units get a hold on seeds somehow). the other concern that we should look into, which might disregard our ATE results is the selection bias where the treated units are not actually randomized(there was a bias on choosing who should get the seeds and who should not)
+
+
+Q4:
+ATT = E[Y_i(1) - Y_i(0) | D = 1]
+ATT is when the farmer is the potential effect of treatment when selected to receive the treatment and receives it from when they are selected for treatment but they don't receive it.
+ATN = E[Y_i(1) - Y_i(0) | D = o]
+ATN is the potential effect of treatment when the farmer is NOT selected to receive the treatment but ends up receiving it minus when they are in the control gorup and they do not receive it. 
+
+Q5:
+```{r}
+library(tidyselect)
+library(dplyr)
+library(ggplot2)
+setwd("/Users/samarnegahdar/Documents/school/spring quarter/Prog Eval")
+ECONS<- read.csv("ps1_data_24.csv")
+ECONS$baseline_yield <- ECONS$baseline_crop_prod_kg / ECONS$baseline_cult_land_ha
+ECONS$endline_yield <- ECONS$endline_crop_prod_kg / ECONS$endline_cult_land_ha
+ECONS$baseline_normal_fetilizer<- ECONS$baseline_fertilizer_kg / ECONS$baseline_cult_land_ha
+ECONS$endline_normal_fetilizer<- ECONS$endline_fertilizer_kg / ECONS$endline_cult_land_ha
+
+
+
+```
+
+```{r}
+
+balance_for_cult_land<- lm(baseline_cult_land_ha ~ econs_trt, data=ECONS)
+summary(balance_for_cult_land)
+```
+the coefficient of baseline yield on treatment is -0.02, with a SE of 0.013 which has a T-value of 0.35 this implies that there is no statistically significant difference between treatment and control group.
+```{r}
+balance_for_fertilizer<- lm(baseline_normal_fetilizer ~ econs_trt, data=ECONS)
+summary(balance_for_fertilizer)
+
+```
+the coefficient of baseline yield on treatment is -0.005, with a SE of 0.18 which has a T-value of 0.03 this implies that there is no statistically significant difference between treatment and control group.
+```{r}
+balance_for_age<- lm(baseline_farmer_age ~ econs_trt, data=ECONS)
+summary(balance_for_age)
+```
+the coefficient of baseline yield on treatment is -0.1, with a SE of 0.14 which has a T-value of 0.8 this implies that there is no statistically significant difference between treatment and control group.
+```{r}
+balance_for_yield<- lm(baseline_yield ~ econs_trt, data=ECONS)
+summary(balance_for_yield)
+```
+we run this regression on each outcome: 
+$Y_i = \alpha + \tau D_i + \varepsilon_i$
+
+the coefficient of baseline yield on treatment is 11322, with a SE of 11326 which has a T-value of 1. this implies that there is no statistically significant difference between treatment and control group.
+when we look at the regressions of baseline characteristics ran on treatment status, we see there is not a significant difference on treatment and control group in general. also, since it is mentioned that this is an RCT, we expect the groups to be balanced in their observable characteristics. 
+p.s.: we normalized the fertilizer so that it can be comparable and on the same level with yield.
+
+Q6:
+```{r}
+ggplot(ECONS, aes(x = baseline_yield, fill = factor(econs_trt))) +
+  geom_histogram() +
+  scale_fill_manual(values = c("red", "green"), labels = c("Untreated", "Treated"), name = "Treatment status") +
+  labs(title = "Pre-treatment Crop Yields for Treated and Untreated Farmers",
+       x = "Baseline crop production",
+       y = "Mean Crop Production (kg)") +
+  theme_minimal()
+```
+
+
+```{r}
+#looking at the data for crop production column for potential outliers
+summary_of_crop<- summary(ECONS$baseline_crop_prod_kg)
+print(summary_of_crop)
+```
+
+
+```{r}
+#filtering out the outlier!
+econs_unextreme <- ECONS[ECONS$baseline_crop_prod_kg < 1200, ]
+# Plot histogram of pre-treatment crop yields for treated and control farmers
+ggplot(econs_unextreme, aes(x = baseline_yield, fill = factor(econs_trt))) +
+  geom_histogram() +
+  scale_fill_manual(values = c("red", "green"), labels = c("Untreated", "Treated"), name = "Treatment status") +
+  labs(title = "Histogram of Pre-treatment Crop Yields",
+       x = "Pre-treatment crop yields", 
+       y = "mean production(kg)") +
+  theme_minimal()%>%
+  print()
+
+
+```
+
+
+when we first run the regression, the first histogram shows up, which is funky! then we look for potential outliers and we find one land with a crop production of 500 hectares.we clean up the dataset of that one outlier and then re-run the regression. the second histogram shows that controlled units have slightly higher baseline yields(before the introduction of the treatment ) but according to the regresison we ran earlier the difference is not significant. 
+
+```{r}
+balance_for_yield<- lm(baseline_yield ~ econs_trt, data=econs_unextreme)
+summary(balance_for_yield)
+```
+even when we run a regression on the filtered data, the difference between the yield for treatment and control are not significantly different. 
+
+Q7:
+
+```{r}
+ATE<- lm(endline_yield ~ econs_trt, data=econs_unextreme)
+summary(ATE)
+```
+
+the regression shows that the crop production for farmers who have received the seeds( AKA treated units) has increased by 36 kgs ON AVERAGE compared to the controlled group( $\alpha$) which had a yield of 360 kgs of production. the mean of control group is actually the intercept for this regression and the estimated $\tau$ is very significant compared to it. this means that treated units yield almost 10 percent more crops than controlled groups. this implies that we reject the null hypothesis that there is no effect on treatment.
+
+Q8:
+```{r}
+#we run a regression of endline fertilizer used on treatment
+endline_regression_fertilizer<- lm(endline_yield ~ econs_trt + endline_normal_fetilizer, data=econs_unextreme)
+summary(endline_regression_fertilizer)
+
+```
+
+```{r}
+baseline_regression_fertilizer<-  lm(baseline_yield ~ econs_trt + baseline_normal_fetilizer, data=econs_unextreme)
+summary(baseline_regression_fertilizer)
+```
+
+there is one condition that should always be met and that is not to run a regression on ENDLINE outcomes. with that in mind, doing what Econs ask us to do is not valid and cannot give us the information expected. the P-value for $\tau$ is no longer statistically significant( approx. 0.3) which is why it shows we should not include endline fertilizer use. 
+
+this model gives us similar results to Q7 with lightly lower coefficient on treatment which is accounted for by the new coefficient of baseline fertilizer. the R2 is also higher which is the result of having more controls. 
+
+Q9:
+we intended to measure ATE but actually measured ITT which is the intention to treatment. which is the effect of treatment on all the units that were assigned to treatment(not necessarily received it)
+
+Q10:
+```{r}
+# Filtering the treated group and running a regression of baseline yield on treatment
+endline_crop_ITT <- lm(endline_yield ~ econs_trt, data = econs_unextreme)
+summary(endline_crop_ITT)
+
+# Extracting the treatment effect estimate from the regression summary
+ITT_estimate <- summary(endline_crop_ITT)$coefficients["econs_trt", "Estimate"]
+ITT_estimate
+# Running a regression of compliance on treatment
+
+
+```
+
+```{r}
+compliance <- lm(econs_got_seeds ~ econs_trt, data = econs_unextreme)
+summary(compliance)
+# Extracting the compliance rate estimate from the regression summary
+compliance_rate <- summary(compliance)$coefficients["econs_trt", "Estimate"]
+summary(compliance_rate)
+# Calculating the Local Average Treatment Effect (LATE)
+LATE <- ITT_estimate / compliance_rate
+print(LATE)
+
+```
+we thought the effect of treatment on yield was 36 kg but with looking at the compliance rate we find a bigger effect of 53 kg increase on treated groups' production.
+
+
+
+no selection bias they are balanced!
+```{r}
+ATT_actual<- lm(endline_yield ~ econs_got_seeds, data=econs_unextreme)
+summary(ATT_actual)
+```
+it shows that the effect was actually higher. those who did receive the seeds had a higher crop production of approximately 99 kg more than those in control group. 
+
+
+Q11:
+this concern falls under the umbrella of spillovers which complicates the RCT but is not necessarily a bad thing. there are ways to measure the effect of spillover like stratifying or clustering. the spillover in fact effects the difference between controlled group outcome and treated group(might show lower ATE than actual effect)

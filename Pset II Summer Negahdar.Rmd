@@ -1,0 +1,344 @@
+---
+title: "Problem set II"
+author: "Summer Negahdar(coded with Onurcan Buyukkalkan)"
+date: "2024-04-16"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Q1:
+evaluating the effect of MPP program can be odne thorugh analyzing the earnings for those who got admitted into HARRIS and those who did not. therefore, winning the lottery (i.e. admission to program) would be our treatment. 
+still we should check for balance between the people we are selecting from admitted and non-admitted individuals. in an ideal world, we want to know what would happen to a person who gets into HARRIS AND doesn't: 
+
+$\tau_{ATE} = E[Y_i(1)] - E[Y_i(0)]$
+
+where $Y_i(1)$ is their earnings if they attend MPP program (AKA treatment effect) and $Y-i(0)$ is their earnings when they don't. however, we cannot observe both treatment and non-treatment at the same time therefore we use the naive estimator:
+
+$\tau_{NAIVE} = \bar{Y}(1) - \bar{Y}(0)$
+
+
+which is the mean of earnings for those who attended HARRIS(considering they have balanced characteristics) and mean of earnings for those who didn't
+
+Q2:
+what HARRIS is asking us to calculate is the average treatment effect on treated(ATT):
+
+$\tau_{\text{ATT}} = E[Y_i(1) - Y_i(0) | D_i = 1]$
+
+
+$D_i=1$ is when person i is assigned to treatment(meaning they have enrolled)
+$Y_i(1)$ is person i's future earning when they are enrolled in MPP
+$Y_i(0)$ is perosn i's future earning when they do not enroll
+the biggest issue here is that we cannot observe $E[Y-i(0) | D_i=1]$ which is called the "potential outcome" for those not enrolled in the program. 
+the difference between ATT and ATE is the population they look at. for ATT they only consider those treated/enrolled but ATE is estimating effect on all applicants. 
+
+Q3:
+
+when the treated and not-treated group are fundamentally different(here having taken statistics class and not) we have a "selection bias".this means in running the regression of earnings on admission we have an omitted variable bias(taking statistics) that is correlated with outcome but is in the error term. 
+
+selection-bias-relevant problems: 
+- In terms of observables, we clearly see how treated and non-treated are different when it comes to their educaitonal background. those who took stats in the first place might be form more qunatitave majors, or have higher IQ, or be significantly better in terms of analyzing compared to those who didn't.
+- Another issue is to ask the question of what industry or fields those who applied to HARRIS in the first place want to work on because the earnings has a direct relation with the industry one is in. 
+- also choosing those who have only taken statistics is not a valid instrument for selection as there are many other reasons why one person might have a higher earning(like connections, networking, language skills necessary for certain public policy jobs) that are irrelevant to the statistics status. 
+
+
+
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(readr)
+library(stargazer)
+library(fastDummies)
+library(dplyr)
+```
+
+Q4:
+```{r}
+setwd("/Users/samarnegahdar/Documents/school/spring quarter/Prog Eval")
+data <- read.csv("ps2_data_24.csv")
+summary(data)
+options(scipen = 999, digits = 6)
+```
+```{r}
+# converting non-string variables to stirngs
+str(data)
+head(data)
+data<- na.omit(data)
+```
+
+```{r}
+#looking at how many unique variables there are in each column:
+unique(data$college_statistics)
+#the "one" is probably the problem here and we need to convert it to 1
+data$college_statistics <- as.character(data$college_statistics)
+data$college_statistics <- gsub("One", "1", data$college_statistics)
+data$college_statistics <- as.numeric(data$college_statistics)
+unique(data$college_statistics)
+```
+
+```{r}
+unique(data$gender)
+# it is interesting that they have "non-binary" so better to make dummy variables out of them:
+data <- dummy_cols(data, select_columns = "gender")
+data$gender <- NULL
+print(names(data)[grep("gender", names(data))])
+```
+
+```{r}
+unique(data$college_calculus)
+```
+```{r}
+unique(data$gre_score)
+```
+```{r}
+unique(data$undergrad_GPA)
+#it is better to convert them to numbers so we can run a regression on it
+gpa_map <- setNames(c(4, 3, 2, 1, 0), c('A', 'B', 'C', 'D', 'F'))
+# Convert undergrad_GPA to numeric GPA
+data$undergrad_GPA_numeric <- sapply(data$undergrad_GPA, function(gpa) {
+if (gpa %in% names(gpa_map)) {
+return(gpa_map[gpa])
+} else {
+return(NA) # Assign NA if the letter grade is not recognized
+}
+})
+print(names(data)[grep("undergrad_GPA", names(data))])
+```
+```{r}
+unique(data$age)
+```
+```{r}
+unique(data$harris_admit)
+```
+
+we can now assume that there aren't any ambiguity therefore the Selection-on-observables assumption stands. 
+
+$Y_i = \alpha + \tau D_i + \gamma X_i + \nu_i$
+where: 
+
+- $Y_i$ represents the outcome variable for the i-th observation.
+- $D_i$ is the treatment indicator variable for the i-th observation.
+
+- $X_i$ represents the covariates for the i-th observation.
+
+- $\alpha$ , $\tau$ , $\gamma$ are coefficients for regression 
+- and finally $\nu$ is the error term for i-th observation
+
+we can rewrite this as: 
+
+$\hat{\tau} = (\bar{Y}_T - \bar{Y}_U) - \hat{\gamma} (\bar{X}_T - \bar{X}_U)$
+
+where: 
+- $\hat{\tau}$ is the estimated treatment effect
+- $\bar{Y}_T$ and $\bar{Y}_U$ are means of outcome variable for treatment(T) and for untreated(U)
+- $\bar{X}_T$ and $\bar{X}_U$ are means of covariate X for treated and untreated groups
+- and finally $\hat{\gamma}$ is the coefficient of covarience of X on Y
+
+first of all, in this equation we assume that $\bar{X}_T$ is as possible close to $\bar{X}_U$ as possible( we are taking out the effect of variance in X from Y). 
+our model asusmes that we are capturing the correct relationship between our outcome(earning) and variables we are controlling for. Specifically, it assumes that the average treatment effect (ATE) of admission to the MPP program remains consistent across different values of the covariates $ X_i$. However, to adequately control for selection-on-observables (SOO), we must include not only the covariates $ X_i $ but also the conditional expectation of treatment assignment $ E[Di|Xi] $. This accounts for the probability of receiving treatment based on the covariates.
+
+To address these assumptions and mitigate potential biases, we employ matching techniques:
+what matching does is to find equivalents of people who have attended MPP at HARRIs outside the program with the same specification and observable variables. then we do this:
+ - dividing data into cells based on characteristics of X
+ - compute the average outcome mean for out treated group $\bar{Y}_i(1)$ and the group outside program $\bar{Y}_i(0)$
+ - we calculate the difference of these two:
+ 
+ $\delta_j = \bar{Y}_{T,j} - \bar{Y}_{U,j}$
+ - estimated average treatment effect $\hat{\tau}_{ATE}$ would be the weighted average of all these differences across cells(assuming that these two groups are comparable: 
+ 
+$\hat{\tau}_{ATE} = \sum_{j=1}^{J} \left( \frac{N_j}{N} \right) \delta_j$
+
+Q5:
+```{r}
+
+```
+
+
+
+```{r}
+
+
+# Create an empty data frame with correct column names
+balance_table <- data.frame(Control_Variable = character(),
+                            Treated_Mean = numeric(),
+                            Untreated_Mean = numeric(),
+                            Difference_in_Mean = numeric(),
+                            P_Value = numeric(),
+                            stringsAsFactors = FALSE)
+
+# Loop through each controlling variable
+for (variable in c("future_earnings", "college_statistics", "college_calculus", "gre_score", "undergrad_GPA_numeric", "age", "gender_FEMALE", "gender_MALE", "gender_NON-BINARY")) {
+  # Perform Welch's t-tests for treated group
+  t_test_treated <- t.test(data[data$harris_admit == 1, variable], data[data$harris_admit == 0, variable], alternative = "two.sided", var.equal = FALSE)
+  
+  treated_mean <- mean(data[data$harris_admit == 1, variable])
+  untreated_mean <- mean(data[data$harris_admit == 0, variable])
+  difference_in_mean <- treated_mean - untreated_mean
+  p_value <- t_test_treated$p.value
+  
+  # Append results to balance table
+  balance_table <- rbind(balance_table, data.frame(Control_Variable = variable,
+                                                   Treated_Mean = treated_mean,
+                                                   Untreated_Mean = untreated_mean,
+                                                   Difference_in_Mean = difference_in_mean,
+                                                   P_Value = p_value,
+                                                   stringsAsFactors = FALSE))
+}
+
+# Print the formatted table
+kable(balance_table, digits = c(3, 3), align = "c")
+
+
+
+```
+as you can see some baseline characteristics are not balanced.
+- future earnings( which is what we want to measure and compare) is higher for HARRIS students than the control group by 123000 USD
+- having taken stats is very imbalanced as we expected( most of untreated have not taken statistics while MPP admits have done so) also, by looking at the difference in mean, we find out that Harris admitted students are 60.1 percentage point more likely to have taken stats. 
+- the same goes for calculus. with a 10.1 percentage point higher rate of taking calculus, the treated group are different from non-treated group in this control as well.
+- HARRIS students GRE score is also higher by 52 points with a significant p-value at 95% CI
+- those accepted into the program also have higher GPAs from college (0.57 point in the scale of 0-4) which is statistically significant. 
+- another thing to look at is the ratio of female to male which is significantly higher for female compared to non-binary or male which is very interesting(this shows that in general women apply to HARRIS more than men because we can see how treated and untreated are balance in terms of gender ratio and female are significantly more in demand of MPP as opposed to men and non-binary population)
+
+
+matching indeed has helped confirm that those admitted are significantly of higher "quality"(don't know if this is the right way to put it) in terms of admission-related variables compared to those who did not get selected. however as said before there are no "DEI" related issues when admitting students in terms of age and gender (woman are accepted more as demand for MPP is higher on their end compared to men and non-binary poeple)
+
+Q6:
+
+-regression adjustment:
+
+Assumption of Functional Form: 
+
+$E[Yi(0) | Xi, Di = 0] = E[Yi(0) | Xi]$
+
+$E[Yi(1) | Xi, Di = 1] = E[Yi(1) | Xi]$
+
+These equations represent the assumption that the expected outcome for individuals who would not receive the treatment (Di = 0) is independent of whether they actually receive the treatment, given their covariate values (Xi). Similarly, the expected outcome for individuals who would receive the treatment (Di = 1) is also independent of whether they actually receive the treatment, given their covariate values (Xi).
+
+since the model is correctly specified the relationship between outcome(earning), treatment(enrollment) and other controls is captured by: 
+$Y_i = \alpha + \tau D_i + \gamma'X_i + \nu_i$
+
+-Matching
+first thing os overlap: to have individuals with each control X in both treatment and ocntrol group that can be compared to each other. 
+second, Unconfoundedness: that assignment to treatment should be independent of covarite of X for potential outcome:
+
+$[D \perp (Y (0), Y (1)) | X]$
+
+according to our balance table the unconfoundednes is probably violated as these unbalanced observation might point out to underlying bias that result in a difference in earnings(our outcome) meaning that the covariance of our treatment might not be the actual relationship between admisison into HARRIS and post-graduation earnings. 
+
+
+
+Q7:
+```{r}
+lm1 <- lm(future_earnings ~ harris_admit + college_calculus + gre_score + undergrad_GPA_numeric + age + gender_FEMALE + gender_MALE + `gender_NON-BINARY`, data = data)
+summary(lm1)
+
+```
+
+```{r}
+#naive estimator without the controlls
+lm_naive <- lm(future_earnings ~ harris_admit, data = data)
+summary(lm_naive)
+```
+
+- we can see that there is a 10000$ difference in the estimated correlation between admission into harris and post-grad earnings when we account for controls and when we don't.
+- also, as we saw in the previous parts, the p-value for gender and age are statistically insignificant meaning that these two factors did not effect the admission decision and our desired outcome. yet history of taking statistics and calculus, undergrad GPA and GRE score are significant and therefore they play a role in the final outcome which is earnings. 
+-the biggest flaw with this model is OVB which is not controlling for everything that is inside error term that is related to outcome but we odnt account for it. 
+-the naive estimator forecasts a higher pay wage meaning that it implies attending Harris would miraculously and independent of other factors increase your earnings while when we control for other variables we see how this estimate drops from 123000 to 113000.
+
+
+Q8:
+```{r}
+# Create a new variable 'non_harris_admit' where 1 indicates not admitted to Harris and 0 indicates admi
+data <- data %>%
+mutate(non_harris_admit = ifelse(harris_admit == 0, 1, 0))
+# Now check for common support with the new control variable
+age_group_support <- data %>%
+group_by(age) %>%
+summarize(n_harris_admit = sum(harris_admit == 1),
+n_non_harris_admit = sum(non_harris_admit == 1),
+.groups = "drop") # "drop" is used to return a standard, ungrouped data frame
+# Display the support check table
+age_group_support
+```
+```{r}
+# Check for common support for multi-variable cells (age and GPA)
+common_support_gpa_age <- data %>%
+group_by(age, undergrad_GPA_numeric) %>%
+summarize(n_harris_admit = sum(harris_admit == 1),
+n_non_harris_admit = sum(harris_admit == 0),
+.groups = "drop") # "drop" is used to return a standard, ungrouped data frame
+# Display the support check table for age and GPA
+common_support_gpa_age
+```
+
+```{r}
+# Filter out cells with no admitted or no non-admitted students
+usable_cells_gpa_age <- common_support_gpa_age %>%
+filter(n_harris_admit > 0 & n_non_harris_admit > 0)
+# Display the usable cells for matching
+usable_cells_gpa_age
+```
+```{r}
+# Calculate the means by cell and treatment status
+grouped_data <- data %>%
+  group_by(age, undergrad_GPA_numeric) %>%
+  summarize(
+    mean_earnings_harris_admit = sum(future_earnings * harris_admit) / sum(harris_admit),
+    mean_earnings_non_harris_admit = sum(future_earnings * non_harris_admit) / sum(non_harris_admit),
+    count_harris_admit = sum(harris_admit),
+    count_non_harris_admit = sum(non_harris_admit),
+    .groups = "keep"
+  )
+
+# Convert the 0-count cells to NA to avoid division by zero
+grouped_data <- grouped_data %>%
+  mutate(
+    mean_earnings_harris_admit = ifelse(count_harris_admit == 0, NA, mean_earnings_harris_admit),
+    mean_earnings_non_harris_admit = ifelse(count_non_harris_admit == 0, NA, mean_earnings_non_harris_admit)
+  )
+
+# Take the difference in means for each cell
+grouped_data$diff <- grouped_data$mean_earnings_harris_admit - grouped_data$mean_earnings_non_harris_admit
+
+# Filter out the cells where the difference is NA
+grouped_data <- grouped_data %>%
+  filter(!is.na(diff))
+
+# View the final grouped data
+grouped_data
+
+```
+```{r}
+
+# Estimate ATE as the weighted average of the differences across all cells
+ate <- weighted.mean(grouped_data$diff,
+w = (grouped_data$count_harris_admit + grouped_data$count_non_harris_admit))
+print(ate)
+
+att <- weighted.mean(grouped_data$diff,
+w = grouped_data$count_harris_admit)
+print(att)
+```
+
+I would have preferred to have ethnicity/ race as a variable but since that is not an option I would do it based on age group and they college GPA.also gender owuld have been another good instrument to pick but since we had converted them to dummy variables I did not know how to treat them
+using exact matching(meaning comparing each individual in the treatment form age group to its closest age group in control group) we find out that on average someone with an MPP degree earns 105k while the untreated groupd earns 100K and there's a 5k difference. these two numbers are very different form the naive estimator of 123k more income for treated compared to non-treated and the reason is because matching uses wegihting in estimating ATE and ATT.
+
+considering how ATT is smaller than ATE we can conclude that this program is more beneficial to a certain group of admitteD(local treatment) as opposed to the whole amditted population which gets us to the point of difference in unobservable characteristics that effect the final earnings. 
+
+still qhat matching does is to simulate an RCT when there is not RCT condition and gives us groups of treatment and control to compare.however, unmeasured confounders is still an issue here as we are "assuming" common support and conditional independence of treatment assignment are valid. 
+
+another advantage that matching has is that by comparing variables with each other in terms of controls we get a better estimate as opposed to when we use the naive estimator without accounting for any other controls than assignment to treatment. still, accounting for all confounders, making sure there is no measurement error is very complex and delicate. 
+
+In relation to question 7, it's important to note that matching and regression are distinct methods with separate approaches to addressing confounding variables. Matching involves pairing individuals based on similar characteristics without specifying a functional form, while regression adjusts statistically for confounders. Upon conducting analysis, we discovered that individuals admitted to the MPP program exhibited a notably higher impact on earnings, amounting to $123,543 more compared to non-admits, with a significant p-value.
+
+Q9:
+
+- when we look at ATT and ATE they are both positive even though different which indicate that attending HARRIS actually increases the earnings for those who attended compared to those who did not attend or were not admitted. 
+- also, what we did here through matching was to make sure we are comparing similar(at least observably similar) individuals with each other to make out assumptions as precise as possible. 
+-still we cannot say "for sure" that there are no other characteristics that influence earnings. 
+but to wrap up: MPP is a good program and hleps people to increase their salary( even tohugh certain people get attracted to this major probably)
+
+

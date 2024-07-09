@@ -1,0 +1,287 @@
+---
+title: "HW3"
+output: pdf_document
+author: "Summer Negahdar(collaborated with Martha McLaren)"
+date: "2024-04-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(stargazer)
+library(broom)
+library(kableExtra)
+library(fastDummies)
+library(AER)
+options(scipen = 999)
+```
+
+```{r}
+rm(list = ls())
+```
+
+
+Q1:
+The treatment (D) in this case is having drip irrigation installed on their fields. The unit of analysis (i) is each farm. The outcome (Y) is farm water use in acre-feet. 
+
+Using the potential outcomes framework, we can explain how we would ideally find the average effect of drip irrigation systems: 
+
+**Potential outcomes framework**
+
+when the farmer gets a drip irrigation system, their outcome is:
+
+$Y_{i}(D_{i} = 1) = Y_{i}(1)$
+
+when the farmer does not get a drip irrigation system, their outcome is: 
+$Y_{i}(D_{i}=0) = Y_{i}(0)$
+
+the impact of treatment (getting a drip irrigation system) for the farmer is:
+
+$\tau_{i}=Y_{i}(1) - Y_{i}(0)$
+
+potential outcome framework is the average treatment effect for each individual (i) when they had received the treatment and not. but since we can only see one outcome (for treatment or not treatment) for each individual then that is not possible(we cannot observe the counter-factual for one farm/farmer). in other words, if they use the dripping irrigation system, we can only see the effect of using it and for other farmers who choose not to do so we can only see their effect of using a non-dripping irrigation system. 
+therefore, we can use the average outcome for treatment and average outcome for non-treatment across each group. 
+
+
+**ATE(Average Treatment Effect)**
+
+$\tau_{ATE} = E(Y_{i}(1)] - E[Y_{i}(0)]$
+
+in an ideal world we could randomize farmers based on their observable characteristics into treatment and control groups to have balanced baseline characteristics, AKA an RCT. these characteristics include the area being cultivated, geographic location or neighborhood/the PH of soil and other factors related to the farmer itself. RCT is applied to ensure a randomzied selesciton into the program in order to make the outcome as independent form other factors than treatment as possible. then we measure the water group of farmers in treatment and groupf of farmers in control use and take an average of all the group. finally we compare the two means and find out what was the impact of drip irrigation in treatment group(compared to control) in acre feet. 
+
+**repeated observations(regression discontinuity design)**
+another method we can use is to observe each farm throughout time and compare their water usage without and with irrigation system. that way each farm/farmer gets to be compared to itself( counter-factual) and therefore it is somehow of a balanced test.the only variable that makes a difference in time is the start of using drip irrigation which makes this a balanced test as well. also there would be no OVB which is ideal. 
+
+Q2:
+
+since we cannot do an RCT, a DiD or acocunt for balance in characteristics, the way to go is using an IV(instrument Variable) design. what IV does is solving the OVB by effecting the outcome purely through the assignment to treatment. (Z--->D---->Y) without having any relevance to any variable that effects the outcome that is not in the model(or it is in the error term).
+there are some assumptions that should be met for Z to be valid: 
+ 
+
+1. **Relevance** 
+$\mathbb{E}[D_i | Z_i = 1] \neq \mathbb{E}[D_i | Z_i = 0]$ (for osme i)
+In words, the instrument $Z_i$ must be correlated with the treatment $D_i$. This means the probability of a farmer using the new system covaries and changes with the instruments.
+$Cov(D_i, Z_i) \neq 0$
+
+2. **Independence:** $Y_i(D_i, Z_i), D_i(1), D_i(0) \perp Z_i$. The instrument must be independent of other confounders that affect $Y_i$, ensuring that it only affects the outcome through our treatment $D_i$.
+
+3. **Exclusion Restriction:** 
+$Y_i(Z_i = 1, D_i) = Y_i(Z_i = 0, D_i$. 
+The instrument $Z_i$ affects the adoption of the new dripping system only through the treatment $D_i$ and not through any other ways. This means that any changes in water use are related to the use of the new irrigation system and not some other effect of the instrument.
+
+4. **Monotonicity:** 
+$D_i(Z_i = 1) - D_i(Z_i = 0) \geq 0$ (for all i)
+The direction of the instrument's effect is the same for all farmers, meaning the instrument should influence the likelihood of getting the treatment in one direction for all individuals( increase or decrease). in other words, the instrument should not **reverse** assignment to treatment. 
+
+
+with omitted variable bias, we have:
+
+$\hat{\tau} = \tau + \beta \frac{Cov(D_{i} X_{i})}{Var(D_{i})}$
+
+Using a valid instrument, the second-stage IV coefficient is: 
+
+$\hat{\tau}_{2SLS} = \tau + \beta \frac{Cov(\hat{D_{i}} X_{i})}{Var(\hat{D_{i}})}$
+
+Via the exclusion restriction, $Cov(\hat{D_{i}} ,X_{i}) = 0$ so:
+$\hat{\tau}_{2SLS} = \tau$
+
+
+
+Q3:
+
+as mentioned in the question, the biggest flaw for this irrigation system is its price. which means that farmers who do not have financial capability would opt out of this program voluntarily. therefore if we assign a subsidy for purchasing this irrigation system we would have a credible instrument. now let's see how this instrument aligns with the four mandatory assumptions:
+
+### A)relevance: 
+
+it is indeed relevant to our treatment which is enrolling in drip irrigation system. 
+
+### B)independance:
+
+the instrument is not relevant to any other variables in error term that are not in our model, i.e. it is randomly assigned through a lottery.
+
+### C)Exclusion restriction
+
+this is still valid in terms of independence. since having a subsidy without using it for purchasing irrigation system cannot effect farmers' outcome.
+
+### D) Monotonicity:
+
+since this is a subsidy, it will increase the likelihood of farmers enrolling into the program which aligns with this fourth assumption (it will not make anyone any less interested in taking the treatment.)
+
+Q4: 
+there are two stages to the 2SLS test:
+A)first stage: 
+when we run a regression of our treatment on our instrument: 
+
+$\hat{D}_i = \pi_0 + \pi_1 Z_i +  \pi_2 X + u_i$
+
+where $\hat{D}$ is the estimated effect of IV(subsidy) on assignment to treatment (enrollment to program), X is out control variable. 
+
+B)second stage
+then using the predicted D_i we predict the second stage:
+$Y_i= \alpha + \beta \hat{D}_i + \epsilon_i$
+
+where $\hat{D}$ is the estimated treatment status & $\beta$ is the effect of assignment to treatment on our outcome. 
+and now we run a reduced form regression: 
+
+$Y_{i} = \alpha + \theta Z_{i} + \pi X_{i} + \eta_{i}$
+
+$\hat{\theta}$ is not our IV estimate, but tells us how our outcome (water usage) varies with the instrument (subsidy) and X is our control variable. 
+
+
+this is isolating the "good variation" in $D_{i}$  the variation in treatment (getting a drip irrigation system) caused by our instrument (subsidy).
+
+now this is our 2SLS regression: 
+
+$\hat{\tau}^{IV} = \frac{\hat{\theta}} {\hat{\pi}_1}$
+
+this treatment effect will actually be a Local Average Treatment Effect (LATE) rather than an ATE because the data used to uncover the effect is the compliers - those who were subsidized and then got a drip irrigation system.
+
+
+Q5: 
+
+```{r}
+setwd("/Users/samarnegahdar/Documents/school/spring quarter/Prog Eval")
+peval <- read_csv("ps3_data_24.csv")
+head(peval)
+view(peval)
+summary(peval)
+```
+
+effect of drip irrigation subsidy on adopting the treatment is our first stage: 
+
+$D_{i} = \pi_0 + \pi_1 Z_{i} + \pi_2 X_{i} + u_{i}$
+
+```{r}
+# Regressing D (getting drip) on Z (subsidy amount)
+reg_first_stage <- lm(drip_adoption ~ drip_subsidy_amount, data = peval)
+summary(reg_first_stage)
+```
+
+since Z is not a binary variable, each additional dollar of subsidy will result in a 0.15 percentage point increase in the probability of enrolling into the drip irrigation system. since this is not an easy way to report, we use scaling: 
+each 100 USD increase in subsidy amount will increase the chance of getting the treatment by 15%. by looking at the regression we see that this estimate is very significant at all levels, also a 15% increase for every 100 dollars is economically significant as well! 
+the subsidy indeed has a **causal** effect on program enrollment(which also makes sense) still the validity of the pilot program should be checked( are they actually randomly assigned? are they good representatives of the whole city?)
+also, R-squared means that our IV accounts for 25% of the variation in our independent variable. the magnitude of this effect depends on the expectations of our test. although 25% might be a good number, it still does not account for 75% of the variation in our independent variable. 
+also F-test is way greater than 20 which implies we have a "good model fit". 
+overall I think this could be a good instrument in measuring the impact of drip irrigation system on water usage based on the amount of subsidy they have been offered. 
+
+
+Q6: 
+
+this is a reduced form regression. The parameter estimated will be $\hat{\theta}$ which is not our IV estimate, but tells us how our outcome (water usage) varies with the instrument (subsidy). 
+
+$Y_{i} = \alpha + \theta Z_{i} + \pi X_{i} + \eta_{i}$
+
+```{r}
+# Run reduced form regression
+reg_reduced_form <- lm(farm_water ~ drip_subsidy_amount, data = peval)
+
+summary(reg_reduced_form)
+
+```
+
+the parameter we are asked is the ($\hat{\theta}$) which we talked about in question 4. this is the result of 2SLS regression. which is the effect of subsidy on water usage and has a negative effect( which is what we are looking for)
+this regression shows that for every 100 USD increase in subsidy the water usage drops by 3.5 percentage point in acre-feet. these estimates are significant in all levels of $\alpha$ (significance level)
+also, by looking at the intercept we can see that the water usage for farms without any subsidy is around 57 acre-foot with a significant t-test. 
+however the adjusted R-squared only accounts for 3.4% of the variation in water use accounted for by subsidy. and 96.6% is left unexplained. still the F-test is very much larger than 20 which still makes this a good regression
+
+although the first stage showed that LATE is very considerable, accounting for subsidy only is not good enough of an instrument to estimate water usage and we should look for other controls to refine our results. 
+
+
+Q7:
+
+
+now is time to combine the previous two regressions and do a final 2SLS regression: 
+first stage: 
+$D_{i} = \pi_0 + \pi_1 Z_{i} + \pi_2 X_{i} + u_{i}$
+
+in the second stage, we regress outcome $Y_{i}$ on predicted $\hat{D_{i}}$:
+
+$Y_{i} = \alpha + \beta \hat{D_{i}} + \delta X_{i} + \epsilon_{i}$
+
+in this equation, $\hat{\tau}$ is our IV estimate.
+
+```{r}
+# Run second stage regression
+# using fitted.values. to find estimated D_i
+reg_second_stage <- lm(farm_water ~ reg_first_stage$fitted.values, data = peval)
+summary(reg_second_stage)
+```
+what the command fitted.values does is to predict the outcome based on the estimated $D_i$ ,($\hat{D}_i$)
+looking at the second stage we realize that for those who did not take the IV, the water use id 53.20 acre-foot( this is our intercept) then, when we look at the coef for fitted value we realize that for every unit increase in compliance with assignment to treatment for our IV, the water usage has dropped by 22.54 acre-foot which according to p-value and t-test are very significant.
+
+```{r}
+mean(peval$farm_water)
+```
+this is also 50% of the average water use which makes it very economically significant.
+ 
+```{r}
+
+# Use ivreg to find the standard errors
+iv_reg <- AER::ivreg(farm_water ~ drip_adoption | drip_subsidy_amount, data = peval)
+summary(iv_reg)
+```
+by looking at the std. Errors we find out that the P-value is very small and therefore not only our test is significant it is precise in predicting the water use based on the subsidy amount. 
+
+**This analysis is local average treatment effect (LATE), focusing solely on compliers influenced by the subsidy to adopt drip irrigation.**
+
+to establish the significant impact of drip irrigation on water usage, we rely on the exclusion restriction, assuming that the subsidy only influences water use by encouraging drip irrigation adoption and is uncorrelated with other factors affecting water use. With random subsidy allocation, both recipients and non-recipients should have similar characteristics on average, validating this assumption. therefore, drip irrigation is deemed influential in water consumption.
+
+Q8:
+
+since the noise is in the outcome and not the independent variable, this would be a classic measurement error and not an attenuation bias. this would therefore only result in a larger std Error but would not effect the coefficient of our model. 
+
+
+It might be classical if farmers just can't remember properly and are reporting their water usage as:
+$\tilde{Y_{i}}= Y_i + \epsilon_i$ 
+$Y_i= \alpha + \beta X_i + u_i$
+
+where $\epsilon$ is larger than $u_i$
+as long as $COV(\epsilon_i,Y_i)=0$ meaning our measurement error is as good as randomly happened, there are still ways to measure $\tau$.
+for classic measurement errors we still can use an IV assuming that $COV(Z_i, \epsilon_i)=0$ but with higher Std. Error and more bias(less precision)
+
+**since PEVAL said it was random, we should be good and do not have to worry about our estimate, only knowing that we would be less precise**
+
+If it's not classical, we have a problem. Non-classical measurement error is "systematic". when the noise is related to the true value and/or other things. Non-classical measurement error in $Y_{i}$ will create bias and  **IV cannot solve systematic measurement errors**
+
+
+
+Q9: 
+
+now the measurement error issue is not with the water usage survey data, but rather with the subsidy amount data. This is "measurement error" that affects the subsidy amount, ie. our treatment
+
+if the subsidy amount data included "random noise", our analysis of causal effect of subsidy on water usage would be impacted but we could solve the issue via IV. 
+
+$\tilde{D_i}= D_i + v_i$
+if we are seeing $\tilde{D_i}$ and not true $D_i$ this is a problem because we can no longer estimate the true effect of $D_{i}$ on $Y_{i}$. 
+our estimated coefficient $\tau$ would be:
+$\hat{\tau} = \tau \frac{\hat{\pi}_1}{\hat{\pi}_1 + v_i}$
+which is always smaller than true $\tau$
+
+
+
+to solve the classical measurement error problem, we'll instrument $\tilde{D_{i}}$ with $Z_{i}$, a different noisy measure of $D_{i}$: 
+
+$Z_{i} = \mathring D_{i} = D_{i} + \zeta_{i}$
+
+we now look at whether it meets up our assumption list:
+
+### first stage assumption:
+
+it meets the first stage assumption because two noisy measures of the same variable ($D_{i}$) should be correlated, as they have $D_{i}$ in common. 
+
+### Exclusion restriction:
+
+it meets the exclusion restriction, as $Z_{i}$ affects $Y_{i}$ only through $\tilde{D_{i}}$
+
+in simple terms, we use $Z_{i}$ to sort out the variation in $\tilde{D_{i}}$ caused by  from other random factors. This helps us handle errors in the subsidy amount data.
+
+if the measurement noise only applies to large subsidies that means we are facing a non-classic measurement error which is not GOOD! This introduces bias and may reverse the sign of the estimated effect ($\hat{\tau}$) compared to the true effect ($\tau$). If larger subsidy amounts are consistently overestimated, it could underestimate the negative impact on water usage or even suggest a positive impact. and Iv is unable to fix this issue. 
+
+
+
+
+
+
+
+
+

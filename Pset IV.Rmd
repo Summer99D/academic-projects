@@ -1,0 +1,384 @@
+---
+title: "Pset IV"
+author: "Summer Negahdar(teammates: Martha Mclaren & Onurcan Boyukalkkan)"
+date: "2024-05-08"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+options(repos = "https://cloud.r-project.org/")
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("magrittr")
+install.packages("plm")
+install.packages("fixest")
+install.packages("sandwich")
+library(magrittr) 
+library(tidyverse)
+library(dplyr)
+library(plm)
+library(lmtest)
+library(fixest)
+library(sandwich)
+df4<- read.csv("ps_4_data_24.csv")
+options(scipen = 999)
+```
+
+Q1:
+**potential outcome framework**
+based on potential outcome framework, the first step is to observe each village under assignment to treatment and then control.
+In the potential outcomes framework, we consider the potential outcome for each unit (in this case, each village) under both treatment and control conditions.
+
+$Y_i(1)$: Poverty rate in village \(i\) if it receives the CDD intervention.
+$Y_i(0)$: Poverty rate in village \(i\) if it does not receive the CDD intervention.
+
+therefore TE for each village \(i\) is $TE_i = Y_i(1) - Y_i(0)$, representing the difference in poverty rates under each circumstance.
+
+still due to the fundamental problem in causal inference, we cannot see the indivudual result for each village under both circumstances.
+**RCT**
+hence, we do an RCT, randomzing villages on receiving treatment and control based on their baseline characteristics to ensure fair assignment.  
+
+To estimate the average treatment effect (ATE) across all villages, we'd then have: 
+
+$ATE = \frac{1}{N} \sum_{i=1}^{N} TE_i$. where \(N\) is the total number of villages.
+
+**DiD**
+another way is to find villages with parallel trends (AKA observable characteristics) and then apply treatment to one, while keeping the other one as control. 
+$Y_{it} = \beta_0 + \beta_1 \text{Treatment}_i + \beta_2 \text{Post}_t + \beta_3 (\text{Treatment}_i \times \text{Post}_t) + \epsilon_{it}$
+where $Y_{it}$ is the poverty rate, therefore we'd have: 
+for treatment:
+$\overline{Y}(\text{treat}, \text{pre}) = \hat{\beta}_0 + \hat{\beta}_2$
+$\overline{Y}(\text{treat}, \text{post}) = \hat{\beta}_0 + \hat{\beta}_1 + \hat{\beta}_2 + \hat{\beta}_3$
+$\rightarrow \overline{Y}(\text{treat}, \text{post}) - \overline{Y}(\text{treat}, \text{pre}) = \hat{\beta}_3 + \hat{\beta}_1$
+for control:
+$\overline{Y}(\text{untreat}, \text{pre}) = \hat{\beta}_0 \\$
+$\overline{Y}(\text{untreat}, \text{post}) = \hat{\beta}_0 + \hat{\beta}_3$
+$\rightarrow \overline{Y}(\text{untreat}, \text{post}) - \overline{Y}(\text{untreat}, \text{pre}) = \hat{\beta}_3$
+if we run this regression we owuld have: $\tau = \hat{\tau}^{DD}$
+
+**Fixed Effect**
+
+
+$Y_{it} = \tau D_{it} + \alpha_i + \delta_t + \beta X_{it} + \epsilon_{it}$
+
+where:
+$Y_{it}$ is the dependent variable, representing the outcome being measured.
+$D_{it}$is a binary treatment variable indicating whether village \( i \) receives the treatment at time \( t \).
+$\tau$is the treatment effect, measuring the change in the outcome when the treatment is applied.
+$\alpha_i$is the individual fixed effect, capturing village-specific characteristics.
+$\delta_t$is the time fixed effect, capturing time-specific factors affecting all villages.
+$X_{it}$ is other control variables for village \( i \) at time \( t \).
+$\epsilon_{it}$is the error term, representing unobservable factors influencing the outcome.
+
+another way is to use FE design where we account for time-invariant unobserved heterogeneity at the village(individual) level. in fact we are comparing each unit with itself as a control because then we would have perfectly balanced characteristics. 
+
+**Event Study**
+
+$Y_{it} = \alpha + \sum_{j=-J}^{J} \delta_j D_{it}^{j} + \beta X_{it} + \epsilon_{it}$
+
+where:
+$D_{it} = \begin{cases} 1 & \text{if } t = T_i(\text{a certain point in time}) \\ 0 & \text{otherwise} \end{cases}$
+
+
+ES is just like DiD, only difference is that we have a certain point in time that serves as the time of treatment and we estimate the effect of intervention before and after that certain point in time. for all periods before $T_i$, we would have $D_i=0$
+
+
+Q2:
+1.Selection Bias: the first issue that arises is whether the villages that have chosen CDD are fundamentally differnet form those who have not. for example ones enrolled in the program might have lower poverty rate to begin with(doing better therefore having means to do CDD)
+2.Endogeneity: factors contributing to enrolling into the CDD might be influenced by unobservable characeristics for each village. for example, what if the village has more educated people? what if the head of village has a higher educaiton or even close ties to those in CDD, therefore they want 
+3. Parallel trends: if we do not have the info over time, we would not know what state where units in prior to applicaiton of the treatment(AKA CDD interventions). there are two ways we can rely on our evidence: 1. to observe the ocunterfactual for each unit (village) which is not possible(causal inference) and second, to find counterfactuals from other villages that have parallel trends. that way we can acocunt for any change in trend over time.
+
+
+Q3:
+it is better now that we have data of different time points for one village(unit) because each unit can be its own control group before and after the treatment. however having only one village is not oging to help. as mentioned in the previous question we still need to have other units in order to account for time-varying elements. indeed one of the identifying assumptions for DiD is the parallel trend assumption. having timely data from other villages helps us account for any change in trend that occured that might have effected the outcome. 
+$E[Y_{i,t}^1 - Y_{i,t}^0 | D_i = 1, T_t] - E[Y_{i,t}^1 - Y_{i,t}^0 | D_i = 0, T_t] = \delta$
+$Y_{it} = \beta_0 + \beta_1 \text{Treatment}_i + \beta_2 \text{Post}_t + \beta_3 (\text{Treatment}_i \times \text{Post}_t) + \epsilon_{it}$
+where $Y_{it}$ is the poverty rate, therefore we'd have: 
+for treatment:
+$\overline{Y}(\text{treat}, \text{pre}) = \hat{\beta}_0 + \hat{\beta}_2$
+$\overline{Y}(\text{treat}, \text{post}) = \hat{\beta}_0 + \hat{\beta}_1 + \hat{\beta}_2 + \hat{\beta}_3$
+$\rightarrow \overline{Y}(\text{treat}, \text{post}) - \overline{Y}(\text{treat}, \text{pre}) = \hat{\beta}_3 + \hat{\beta}_1$
+for control:
+$\overline{Y}(\text{untreat}, \text{pre}) = \hat{\beta}_0 \\$
+$\overline{Y}(\text{untreat}, \text{post}) = \hat{\beta}_0 + \hat{\beta}_3$
+$\rightarrow \overline{Y}(\text{untreat}, \text{post}) - \overline{Y}(\text{untreat}, \text{pre}) = \hat{\beta}_3$
+if we run this regression we owuld have: $\tau = \hat{\tau}^{DD}$
+$\rightarrow$ this is how we cna find the actual effect of treatment for treated units(villages)
+
+
+Q4:
+when we have more than two villages(one treatment and one control) then we have a more robust regression. meaning that we can now take the ATE for each group as opposed to TE for one unit in each group. this would result in an increase in precision and more variety of Y might be explained.as seen below: 
+
+$\text{Standard Error} = \frac{s}{\sqrt{n}}$
+which n in the denominator is the variety in sample size, the large the sample the smaller our std. error would be.(internal validity)
+also, by having a large sample data, our regression would be externally valid and therefore we could apply it to other
+
+$Y_{it} = \beta_0 + \beta_1 \cdot \sum_{i=1}^{N} T_i + \beta_2 \cdot \text{Post}_{t} + \beta_3 \cdot \sum_{i=1}^{N} (T_i \times \text{Post}_{t}) + \epsilon_{it}$
+where:
+$Y_{it}$ is outcome variable for unit i at time t.
+$T_i$ is a binary variable that equals 1 if unit i is in the treated group, and 0 otherwise.
+$\text{Post}_t$is a binary variable that equals 1 for observation in post-treatment period, and 0 otherwise.
+$(T_i \times \text{Post}_t)$ is the interaction between treatment status and the post-treatment period, representing the TE.
+
+As for coefficients:
+$\beta_0$ is the intercept term.
+$\beta_1$ is control group's ATE
+$\beta_2$ is average change in the outcome for control group(our counterfactual)
+$\beta_3$ is treatment's ATE
+$\epsilon_{it}$ is the error term.
+
+###Identifying Assumptions
+first, we assume the villages that have gotten treatment after 2005, would have followed the same trend with prior to 2005 had they not gotten treated. in other words we reject the possibility of having any **time varying** characteristics ($V_{it}$) bevause if there is any, then our estimate owuld be biased and not capturing the sole effect of treatment. 
+
+###Concerns
+the first concern is the potential spillovers of treated villages on untreated villages. having lower poverty rate might result in increased trade between villages and as a result the untreated villages might witness a drop in their poverty rate.
+
+second, we have the measurement error concerns which if taken place in large data sets our estimate of the treatment effect would be inaccurate. like for example what if the village heads have misreported the actual poverty rate before the treatment and after it(consciously or unconsciously)
+
+Q5:
+
+since we have different points in time, we better use the multiple_treatment_timing FE where we would have three groups:
+early treatment group(2005) >>K
+late treatment group>>L
+never treated>> U
+we still use the general FE equation
+$Y_{it} = \alpha + \beta X_{it} + \gamma_i + \epsilon_{it}$
+
+where $\gamma_i$ is the common time effects and $\alpha_i$ is the individual village fixed effects which would give us a $\hat{\tau}$ that accounts for different treatment effects across time with varying characteristics between villages.
+but the estimated $\hat{\tau}$ would be weighted combination of three estimates.
+
+Q6:
+the villages that have enrolled in the  CDD do have a variable for CDD year column while those who did not get treated do not have anything! that's why we can filter by column CDD-year being an NA or not.
+```{r}
+CDD_treat <- df4 %>%
+  filter(!is.na(cdd_year)) %>%
+  summarise(mean_poverty_rate = mean(poverty_rate, na.rm = TRUE))
+print(CDD_treat)
+
+```
+
+
+we are going to take the mean for column with NA, which are control units. 
+```{r}
+CDD_ctrl <- df4 %>%
+  filter(is.na(cdd_year)) %>%
+  summarise(mean_poverty_rate = mean(poverty_rate))
+print(CDD_ctrl)
+```
+let's just take the naive ATE through a simple mean difference:
+```{r}
+ATE_naive<- CDD_treat - CDD_ctrl
+print(ATE_naive)
+```
+this naive estimator suggests that villages with CDD implemented had on average 25 percentage point lower poverty rates than their controlled counterparts. still, this is our "naive" estimator and therefore it does not account for fundamental differences between treated and controlled, as we have discussed in Q2. (we are probably overestimating the effect without accounting for underlying differences)
+
+Q7:
+
+```{r}
+#we filter for year 2005!
+cdd_2005 <- df4 %>% filter(cdd_year == 2005)
+cdd_2005$early_trtmnt <- ifelse(cdd_2005$year >= 2005, 1, 0)
+Q7 <- lm(poverty_rate ~ as.factor(year), data = cdd_2005)
+summary(Q7)
+```
+
+the intercept suggests that baseline poverty is 40% with a statistically and economically significant p-value. if we look at the coefficients from before 2005, we realize that poverty rate has not changed drastically(difference rate non- significant) but after 2005(policy implementation) we see a very distinct coefficient with a significant p-value(~16pp) which means every treated unit have experienced a 16pp decrease in their PR upon applying the policy.
+
+we will run a interaction regression:
+```{r}
+inter_reg <- lm(poverty_rate ~ year + early_trtmnt, data = cdd_2005)
+summary(inter_reg)
+```
+
+By looking at the year coefficient we realize that each year of postponing the treatment after 2005, would increase the poverty rate by 0.4 percentage point. while  the enrollment to treatment at 2005 would suggest an 18.5 percentage point decrease in poverty level, while both being statistically significant; as well as economically! 
+however when compared to the naive estimate (25pp) we realize that ATT was indeed overestimating the effect of policy by approximately 7pp. 
+also, looking at R-squared, we realize that 18% of the variance in outcome(poverty rate) is explained by our regression which is not very high but is precise (p-value<< 0.05). this suggests that we do not have as much data on the villages as we were expecting and therefore this model cannot be externally valid!
+
+now we are going to plot it: 
+```{r}
+#APR stands for Average Poverty Rate
+APR <- cdd_2005 %>%
+group_by(year) %>%
+summarise(APR = mean(poverty_rate, na.rm = TRUE))
+ggplot(APR, aes(x = year, y = APR)) +
+geom_line(color= "pink", size=2) +
+  geom_vline(xintercept = 2005, linetype = "dashed", color = "green") +  
+labs(title = "Average Poverty Rate for villages implementing CDD on year 2005 over time",
+x = "Year",
+y = "Average Poverty Rate") +
+  scale_x_continuous(breaks = unique(APR$year))
+```
+the plot also confirms our speculation that the poverty rate drops at year 2005 upon the implication of treatment while being its highest right before 2005. this might suggest that enrollment to treatment could actually effect the treated units prior to receiving treatment(therefore it is best to remove the immediate post and pre treatment) but still comparing pre and post we realize how this intervention has resulted in a drop in poverty rate.
+
+
+
+Q8:
+
+```{r}
+ctrl_group <- df4 %>% filter(is.na(cdd_year))
+Q8 <- lm(poverty_rate ~ as.factor(year), data = ctrl_group)
+summary(Q8)
+```
+
+the first problem that I noticed is the poverty rate at baseline which is 54% and is very different from the baseline PR for treated group(this means treated groups were different from control group to begin with!) and looking at the coefficients for years we realize that their poverty rate has not changed that much (less than 5 percent) 
+
+```{r}
+APR_ctrl <- ctrl_group %>%
+group_by(year) %>%
+summarise(APR_ctrl = mean(poverty_rate))
+ggplot(APR_ctrl, aes(x = year, y = APR_ctrl)) +
+geom_line(color= "orange", size=2) +
+  geom_vline(xintercept = 2005, linetype = "dashed", color = "maroon") +  
+labs(title = "Average Poverty Rate for villages not implementing CDD",
+x = "Year",
+y = "Average Poverty Rate") +
+  scale_x_continuous(breaks = unique(APR$year))
+```
+
+it is interesting to see that even controlled villages have seen a drop after year 2005 (and this is probably due to spillover effects that we have talked about)although they do go up over time. the Ashenfelter dip (especially in 2012-13) is also evident here which means there might be external shocks that are changing the estimates.therefore the parallel trends assumptions might be violated.
+
+Q9:
+
+The equation is this:
+
+$\tau^{\text{DD}} = (Y_{\text{treat, post}} - Y_{\text{treat, pre}}) - (Y_{\text{untreat, post}} - Y_{\text{untreat, pre}})$
+
+```{r}
+pre_trt<- mean(cdd_2005$poverty_rate[cdd_2005$year < 2005])
+post_trt<- mean(cdd_2005$poverty_rate[cdd_2005$year >= 2005])
+pre_ctrl<- mean(ctrl_group$poverty_rate[ctrl_group$year < 2005])
+post_ctrl<- mean(ctrl_group$poverty_rate[ctrl_group$year >= 2005])
+tau_dd<- (post_trt - pre_trt) - (post_ctrl - pre_ctrl)
+print(tau_dd)
+
+```
+
+
+this result shows that the ATT is -15 pp which is around 1.1 percentage point smaller than the estimated effect we had calculated in Q7 and the reason is including the untreated group in our estimate. 
+
+the regression with no fixed effect would follow this order:
+$Y_{it} = \alpha + \tau(Treat \times Post)_{it} + \beta Treat_i + \delta Post_t + \epsilon_{it}$
+
+ we combine both groups:
+```{r}
+cdd_noP<- cdd_2005%>% select(-early_trtmnt) # we drop this to be able to combine
+sans_FE<- rbind(cdd_noP, ctrl_group)
+sans_FE$post<- ifelse(sans_FE$year >= 2005, 1, 0)
+sans_FE$trtd <- ifelse(!is.na(sans_FE$cdd_year), 1, 0)
+sans_FE$interaction<- sans_FE$trtd * sans_FE$post
+summary(sans_FE)
+```
+now we run the regression: 
+```{r}
+reg_DD <- lm(poverty_rate ~ trtd + post + interaction, data = sans_FE)
+summary(reg_DD)
+```
+
+the coefficient for interaction is the same as we found through simple mean comparison with a significant p-value. still looking at the R-squared we realize that only 15% of variation in poverty rate has been explained by our model.
+
+**with FE**
+now we calculate the effect r years after 2005
+
+```{r}
+with_FE<- sans_FE %>%
+mutate(trt_post = case_when(
+!is.na(cdd_year) & year >= cdd_year ~ 1, # Post-treatment years for treated villages
+TRUE ~ 0 # Pre-treatment and never treated
+))
+head(with_FE)
+```
+we are controlling for common time shocks $\delta_{it}$ and time invariant through village id:
+```{r}
+reg_FE <- feols(poverty_rate ~ trt_post | village_id + year,
+data = with_FE,
+cluster = ~village_id)
+etable(reg_FE)
+```
+we again have the same number (15) as the previous analysis done through non-FE and simple mean comparison but compared to Q6 where we had a naive estimate of 25 pp and Q8 where the ATE was 18.5 the results are different, implying that accounting for time invariant differences would indeed result in a lower ATE for treated. still the CDD intervention does decrease the poverty rate. 
+
+Q10:
+
+```{r}
+group_PR <- df4 %>%
+  filter(cdd_year %in% 2005:2010) %>%
+group_by(cdd_year, year) %>%
+summarise(APR = mean(poverty_rate), .groups= "drop")
+```
+now we plot them across time:
+```{r}
+df4 %>%
+mutate(cdd_year_group = ifelse(is.na(cdd_year), "NA", as.character(cdd_year))) %>%
+filter(cdd_year_group %in% c("NA", "2005", "2006", "2007", "2008", "2009", "2010")) %>%
+group_by(cdd_year_group, year) %>%
+summarize(APR = mean(poverty_rate)) %>%
+ggplot(aes(x = year, y = APR, color = as.factor(cdd_year_group))) +
+geom_line(size= 0.7) +
+labs(title = "Average Poverty Rate Over Time by CDD Adoptation Year",
+x = "Year",
+y = "Average Poverty Rate",
+color = "CDD Council Setup Year") +
+theme_minimal()+
+   scale_x_continuous(breaks = unique(APR$year)) +
+  theme(axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=1)) +
+  scale_color_manual(values = c("lightgreen", "hotpink", "orange", "yellow", "grey", "skyblue", "black"))
+
+```
+
+
+
+```{r}
+# Excluding the 2010 CDD setup year from the dataset
+filtered_data <- df4 %>%
+filter(cdd_year != 2010 & cdd_year %in% 2005:2010)
+# Creating treatment and post variables
+filtered_data$trtd <- ifelse(!is.na(filtered_data$cdd_year), 1, 0)
+filtered_data$post <- ifelse(filtered_data$year >= filtered_data$cdd_year, 1, 0)
+filtered_data$interaction <- filtered_data$trtd * filtered_data$post
+
+panel_data <- pdata.frame(filtered_data, index = c("village_id", "year"))
+# Running the fixed effects model
+# Including fixed effects for both village and year
+fe_model <- plm(poverty_rate ~ interaction + trtd + post | 
+                  village_id + year, data = panel_data)
+# Display the summary with robust standard errors
+summary(fe_model)
+```
+again our interaction shows the same estimate of coefficient with a significant P-value. as for which year to remove(the outlier) it seems that year 2010 should be the problem as it is not following the parallel trend assumption. but by doing so we lose a bit of our statistic power, we now see the coefficient has dropped to 14.6 pp as opposed to 14.9~15 pp.
+I create a new df without the data from 2010:
+```{r}
+sans2010 <- df4%>%
+filter(!(cdd_year == 2010 & !is.na(cdd_year)))
+summary(sans2010)
+```
+Q11:
+```{r}
+Q11 <- sans2010 %>%
+mutate(cdd_imp = ifelse(!is.na(cdd_year), 1, 0), 
+       event_time = ifelse(cdd_imp == 1, sans2010$year - sans2010$cdd_year, 0))
+# event study
+ES <- feols(poverty_rate ~ i(event_time, cdd_imp, ref = -1) | village_id + year,
+cluster = ~village_id, data = Q11)
+etable(ES)
+## now I am going to plot this
+
+iplot(ES, type = "coef", error_bars = TRUE, ci_level = 0.95,
+main = "Effect of establishing CDD council on village poverty rate",
+xlab = "Time since establishing CDD council(r)",
+ylab = "Estimate of effect on poverty rate (pp) and 95% CI")
+```
+a few things can be implied from this plot: 
+1. before policy implementation at period 0, the poverty rate fluctuated( the bandwidth of each point)
+2.naturally, we odnt see any effect of treatment in the pre period( 00 on the y axis)
+3. passing the treatment period, it shifts to 15pp area( which is just as had estimated previous to this) 
+4. looking at the 5-10 years after intervention, we see that the effect of program is larger but since the CIs are wider, we don't exactly know where in the domain of 14.7-16 pp it falls so we cannot say for sure that over time, the CDD intervention would for sure be more effective. 
+
+
+Q12:
+
+throughout different questions we have estimated the effect of our program fairly precise, but I think removing the non-parallel 2010 data which we did refined our conclusions. 
+one big shortcoming that still concerns me is that the initial PR for villages that adopted the program was 14 pp lower than those who didn't and I am wondering why those specific villages did end up rolling into the program. this tohught would concern me in terms of program effectiveness (was it actually the CDD intervention or did those treated units have some underlying characteristics that made them decrease their PR)
+this issue gets more important since our models did not have a large precision number and could only explain a fraction of the variance in our PR so we sohuld be careful with generalization. 
+also, the data we have ends around 2014-2015 and since then we have had so many globally influential incidents that changed the foundation of economics across societies. Pandemic, war and severe climate change are but a handful and therefore we don't know for sure whether these policies are still effective up to this day or not. if CHICAGO wants to promote its policy effectiveness there should be two more add-ons: 
+1.what happened to the untreated units and how they have changed throughout time?
+2. what is the current PR in this area? how has it changed beyond 2014-2015? 
+3.the data and controlling factors should be more as to increase the precision of our model therefore we can validate it externally and internally. 
+if we have answers for these questions, then we might be able to promote this policy "reasonably" and not "STRONGLY"
