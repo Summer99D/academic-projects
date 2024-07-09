@@ -1,0 +1,436 @@
+---
+title: "Final Exam 2024"
+author: "Summer Negahdar"
+date: "2024-05-17"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+options(repos = c(CRAN = "https://cran.rstudio.com/"))
+## installing packages
+library(tidyverse)
+library(estimatr)
+library(broom)
+library(car)
+library(plm)
+
+
+##I don't want my numbers in scientific model:
+options(scipen = 999)
+
+```
+
+
+
+```{r}
+# loading the CSV file
+setwd("/Users/samarnegahdar/Documents/school/spring quarter/Prog Eval/Final")
+Part1<- read.csv("final_exam_data_q1.csv")
+
+```
+1A:
+
+
+the equation for ATE is:
+
+$\text{ATE} = \mathbb{E}[Y(1)] - \mathbb{E}[Y(0)]$
+
+
+```{r}
+average_T<- mean(Part1$potential_satisfaction_1)
+print(round(average_T, 2))
+average_C <- mean(Part1$potential_satisfaction_0)
+print(round(average_C,2))
+ATE_1A <- Part1 %>%
+  mutate(treatment_effect = potential_satisfaction_1 - potential_satisfaction_0) %>%
+  summarise(ATE = mean(treatment_effect, na.rm = TRUE))
+print(round(ATE_1A$ATE, 2))
+```
+the average_t which is the potential MIND program effect on job satisfaction is 44.25 meaning that the job satisfaction if everyone had taken the program would be on average 44.25. 
+the average_c is the current job satisfaction score 50.02 which means that people on average ar more satisfied without the MIND being implemented
+so average treatment effect here means that implementing MIND program would decrease the overall job satisfaction by 5.77 points! 
+
+
+1B
+```{r}
+##takeup rate forthose who were offered
+TR_1 <- Part1 %>%
+  summarise(TR_1 = sum(mind_takeup == 1) / sum(mind_offer == 1)) %>%
+  pull(TR_1)
+print(round(TR_1, 2))
+```
+
+40% of those who were offered the enrollment to MIND actually took it.
+```{r}
+# Calculate the take-up rate for those not offered the program
+TR_0 <- Part1 %>%
+  filter(mind_offer == 0) %>%
+  summarise(TR_0 = sum(mind_takeup == 1) / n()) %>%
+  pull(TR_0)
+
+print(round(TR_0, 2))
+```
+no one who was not offered the program took it and therefore we have a compliance for our control group!
+```{r}
+
+##how many people took up the offeR? 
+total_takeup<- Part1%>%
+  summarize(total_TU= sum(mind_takeup==1))
+print(total_takeup)
+```
+I just wanted to see how many poeple out of 125k were offered the program so we have a better estimate and overview of how the MIND program would effect the job satisfaction and for what fraction of the total study population. 
+
+she is asking for ITT(intend to treat)
+
+$\text{ITT} = E[Y(1)] - E[Y(0)]$
+```{r}
+ITT_T <- Part1 %>%
+  filter(mind_offer == 1) %>%
+  summarize(mean_potential_satisfaction_1 = mean(potential_satisfaction_1)) %>%
+  pull(mean_potential_satisfaction_1)
+print(round(ITT_T, 3))
+```
+the mean job satisfaction for those who have been offered the MIND program is 44.201
+
+```{r}
+ITT_C <- Part1 %>%
+  filter(mind_offer == 0) %>%
+  summarize(mean_potential_satisfaction_1 = mean(potential_satisfaction_1)) %>%
+  pull(mean_potential_satisfaction_1)
+print(round(ITT_C,3))
+```
+
+the mean job satisfaction for those who have not taken the MIND program is 44.299 
+```{r}
+ITT <- ITT_T - ITT_C
+print(ITT)
+```
+
+this suggests that the MIND program would drcrease the job satisfaction of those being offered by almost 0.1 point. 
+
+
+1C:
+
+$\text{ATT} = E[Y(1) | D = 1] - E[Y(0) | D = 1]$
+
+```{r}
+##the effect of treatment is actually ATT: average treatment effect on the treated
+ATT_T<- Part1%>%
+  filter(mind_takeup==1)%>%
+  summarise(mean_ATT_T= mean(potential_satisfaction_1))%>%
+  pull(mean_ATT_T)
+ATT_C<- Part1%>%
+  filter(mind_takeup==0 & mind_offer==1)%>%
+  summarise(mean_ATT_C= mean(potential_satisfaction_0))%>%
+  pull(mean_ATT_C)
+ATT<- ATT_T - ATT_C
+print(ATT) 
+
+```
+the ATT is the average effect of treatment of those who ACCEPTED the offer(among those offered in the first place) meaning for those who accepted the offer compared to those who were offered but did not enroll, we see a 24.68 point increase in their overall satisfaction. 
+
+
+```{r}
+Part1$ATT_col<- Part1$potential_satisfaction_1 - Part1$potential_satisfaction_0
+real_effect<- Part1%>%
+  filter(mind_takeup==1)%>%
+  summarize(mean= mean(ATT_col))
+print(real_effect)
+```
+I filtered the data so that I can see the average ATT for those who have enrolled into the program(since only those who were not offered did not enroll at all) and the number is the same as before. meaning enrolling into the program for those who were offered the change increases their job satisfaction by 24.6 points!
+
+##now the LATE:
+since the takeup for control is 0, meaning they are fully complying with their assignment to treatment, if we use the assigned to treatment group as our IV, we can get an accurate LATE estimate. so our design would be to run a regression on those offered (mind_offer==1) AND then those who took it (mind_takeup==1)
+
+```{r}
+#first stage regression
+first_stage<- lm(mind_takeup ~ mind_offer, data= Part1)
+summary(first_stage)
+```
+this shows that being offered the program increases the probability of enrolling in it by almost 40pp which has a very small p-value. this means that it is significantly effecting the decision to enroll! (our F-test is also very strong indicating the IV to be storng!)
+
+
+```{r}
+iv_model <- AER::ivreg(potential_satisfaction_1 ~ mind_takeup | mind_offer, data = Part1)
+summary(iv_model)
+# The coefficient of predicted_attendance represents the estimated impact of attendance on job satisfaction (ATT)
+
+```
+mind_takeup is our LATE coefficient, which is   -0.24, this means that job satisfaction score drops by 24pp upon the admission to MIND program HOWEVER the P-value is 0.576 which implies there is no significance or whatsoever.   
+This estimate is valid for individuals who were offered the program (MIND) and whose attendance decision was influenced by the offer( the compliers)
+
+
+1D:
+
+the CEO is talking about three conditions of IV which is 1.relevance and 2.independence and  3.exogeneity. while the first one is valid in our regression( the takeup rate that we calculated and the first stage that showed being offered the program increases takeup by 40pp with a small p-value proves relevance) we must check for the second condition which implies there cannot be any correlation between the instrument and potential outcomes. (being offered the program would not result in a change in job satisfaction). finally, third condition implies that there should not be anything in the error term that is correlated with the instrument. 
+
+```{r}
+#what if I run a regression of job satisfaction on mind_offer
+independence <- lm(potential_satisfaction_1 ~ mind_offer, data = Part1)
+summary(independence)
+```
+the coefficient of mind_offer on job satisfaction is -0.09764  with an insignificant P-value and therefore the second condition is also met! 
+
+As for the third condition there is no way we can check for it. we can only intuitively account for all potential controls to be exogenous of our IV.
+
+###I have a a concern though, what if employees treat the offer to MIND as a benefit of their job and that actually changes their satisfaction? what if those who were not offered actually feel discouraged and bad about their performance and therefore their satisfaction drops? 
+```{r}
+##what if assignment to treatment backfired?
+backfire<- Part1%>%
+  filter(mind_offer==0 & mind_takeup==0)%>%
+  summarise(mean= mean(ATT_col))
+print(backfire)
+```
+so I might be right about it that it is not those who were offered that resulted in a drop in satisfaction. rather it was those who were deprived that actually now have lower score! 
+
+1E:
+
+## I am assuming that the potential_satisfaction-1 is EVERYONE's final score after the MIND was offered to some employees?? (the result of program for offer-takers is not oging to change if we imply that column to be only the potential outcome for those who have taken the program and not post-offer outcome fore everyone)
+it is true that the ATT (Average treatment for treated) increase the job satisfaction for those who complied with their assignment but when we do a LATE we realize that in general the effect  of MIND program on the whole population is not positive. this might be because those who did not get into the program now feel worse seeing others benefiting from meditations. 
+I will now bring all thep ieces of our analysis back together:
+1. out of 125k employees, we only had around 25k offered the program. 40% of which enrolled into the mediation. 
+2. those enrolled actually experienced an increase of 24.6 points in their satisfaction while those wo were not offered the chance to begin with (the control group) experienced a 5.7 point drop! 
+ 
+my recommendation is to make enrolling into the program optional since that way no one would feel "less worthy/not worthy" of actually receiving this benefit. about continuing it, it is true that average score for those enrolled into the program is indeed higher (74.55) yet, it is not significant! I don't think continuing it is a wise decision unless we run a second type of test in which we measure people's score upon a "optional" enrollment (to eliminate the backfires of selecting and selection bias)
+
+
+###Q2###
+
+2A:
+using the regression equation we can estimate the mean value of housing for pre period and post period for control and treatment groups. our treatment is Austin and our contorl group is Dallas. therefore the pre period is any time before we apply the tree-planting program to Austin which is 1997. 
+$$
+\text{Housing value}_{it} = 50 + 8 .\text{Ever Trees}_{i} \times \text{Post}_{t} - 40. \text{Ever trees}_{i} + 15 .\text{Post}_{t}
+$$
+
+$$
+\text{Housing value}_{it} = \beta_0 + \beta_3. \text{Ever Trees}_{i} \times \text{Post}_{t} - \beta_1 . \text{Ever trees}_{i} + \beta_2 \text{Post}_{t}
+$$
+
+in a Dif-in-Dif model the coefficients and intercepts stand for:
+\[
+\begin{array}{|c|c|c|}\hline & \text{Pre} & \text{Post} \\ \hline \text{Control} & \beta_0 & \beta_0 + \beta_2 \\ \hline \text{Treatment} & \beta_0 + \beta_1 & \beta_0 + \beta_1 + \beta_2 + \beta_3 \\ \hline \end{array}
+\]
+
+this is how our table based on the regression would look like!
+
+$$
+\begin{array}{|c|c|c|}
+\hline 
+& \text{Pre(1995)} & \text{Post(1997)} \\ 
+\hline 
+\text{Control(Dallas)} & 50 & 65 \\ 
+\hline 
+\text{Treatment(Austin)} & 10 & 33 \\ 
+\hline 
+\end{array}
+$$
+
+
+Austin's housing value, pre-treatment: 10
+Austin's housing value post-treatment: 33
+
+Austin's housing value increase:  (33-10)/10= 230 %
+Dallas' housing value, pre-treatment: 50
+Dallas' housing value, post-treatment: 65
+
+Dallas' housing value increase: (65-50)/50= 30%
+
+2B:
+the treatment effect is the coefficient for the interaction term, which is 8. this means that the average value of housing increases by 8k for those who got the treatment( meaning the houses in Austin that planted the trees)
+
+the assumption that we should make to hold the causal effect valid is the "parallel trends assumptions" this indicates that Austin and Dallas had similar trends prior to treatment and therefore the increase in house value that Austin is experiencing is purely due to the treatment!( we don't have enough data to check for it actually but we'll hope the policy ,akers would actually ocntrol for that!)
+
+
+2C:
+\[
+\text{Y}_{it} = \sum_{s=0}^{S} \tau_s \text{D}_{i,t-s} + \alpha_i + \delta_t + \beta \text{X}_{it} + \epsilon_{it}
+\]
+
+
+So since v7 is event +1 this means that the $\tau$ we are going to measure in the regression is going to be $\tau_1$ which would give us the marginal effect of treatment 1 period later. (the s in this equation is the periods away from treatment which in this case is 2000>> one period after 1999)>. this model is to see whether the effect of policy would change across time
+
+
+2D:
+this is the equation for a Event Study(ES) model and then eventually we expand it into a multiple-treatment-timing FE
+this means we are going to have a control group(never treated)
+an early treated group (k)
+and a late treated group(l)
+
+$\alpha_i$ captures the individual characteristics and 
+$\gamma_i$ captures the time varying differences
+finally, $\epsilon_i$ is the error term. 
+$\tau_it$ is the average treatment effect of planting trees on values of the houses for each unit (i) after the treatment( note that this model will only capture the effect of treatment on treated units and not control and treated!). therefore we would have four different estimates. 
+
+1. comparing Austin to Dallas( early treated to untreated)
+2. comparing Houston to Dallas(late treated to untreated)
+3.comparing Houston to Austin before early treatment(early to late, in the pre period)
+4.comparing Houston to Austin after early treatment(early to late, in the mid period)
+the final result would be a weighted combination of all these coefs. 
+the concerning comparison is the fourth one, which is the early treated(Austin) to late treated(Houston) in the mid period comparison. this is not a "clean comparison" since the early treated is now acting as a control for the late treated units but the problem is that those units ARE ALREADY TREATED THEMSELVES!! this would not be a problem if we observe the treatment effect of early treated as a level shift (parallel trends) meaning they would still follow the same trend with late treated gorups but if the treatment changes the trend( the slope of the regression line) then we cannot use this comparison. 
+
+
+###Q3###
+
+3A:
+Average yield for irrigated lands:
+$\bar{Y}_{\text{Irrigated}} = \frac{1}{N_1} \sum_{i:D_i=1} Y_i$
+
+Average yield for not-irrigated lands:
+$\bar{Y}_{\text{Not Irrigated}} = \frac{1}{N_0} \sum_{i:D_i=o} Y_i$
+
+where $Y_i$ is the yield for unit i (land i)
+N_1 is the total number of irrigated lands
+N_0 is the total number of not irrigated lands
+D_i is the treatment status
+
+and the simple comparison between these two average yields would be:
+
+$\Delta \bar{Y} = \bar{Y}_{\text{Irrigated}} - \bar{Y}_{\text{Non-Irrigated}}$
+
+this is not a strong instrument for a causal interpretation of irrigation's effect on Yield. tthe confounding factors are first things we need to check which is not available in a simple comparison model and then 
+first of all we have selection bias: selection bias is the basic fundamental problem we face and should account for. it refers to 
+then we need to check for OVB
+third issue is Endogeneity
+so we need to adopt a model which can help us determine the results more precisely. 
+
+
+3B:
+So since we have a "cutoff" here (the line which separates those who get irrigation and those who don't) we better use the "regression Discontinuity design(RDD)" where the running variable would be distance form canal and assignment to treatment would mean whether they received irrigation or not!
+
+
+\[
+\text{Yield}_{it} = \beta_0 + \beta_1 \times \text{Irrigation}_{it} + \beta_2 \times \text{DistanceToCanal}_{it} + \beta_3 \times \text{Irrigation}_{it} \times \text{DistanceToCanal}_{it} + \mathbf{\beta_4} \cdot \mathbf{X}_{i} + \epsilon_{it}
+\]
+
+
+
+$X_i$ is our control variable(s) which in this case the distance to river would be one example. however, we don't have data on that and therefore the first issue we are going to face is OVB(omitted variable bias)
+meanwhile, $\beta_1$ is the treatment effect of irrigation on yield.
+
+
+3C:
+```{r}
+#let's load the csv file first:
+
+Part3<- read.csv("final_exam_data_q3.csv")
+head(Part3)
+```
+```{r}
+#the scatterplot:
+ggplot(Part3, aes(x = distance_above_canal, y = irrigation)) +
+  geom_point(color= "skyblue", alpha=0.4) +
+  geom_vline(xintercept = 0, color = "pink", linetype = "dashed",size= 1.5, label = "Cutoff")+
+  labs(
+    title = "Effect of Irrigation on the Canal cutoff",
+    x = "Distance Above Canal (m)/Running variable",
+    y = "Irrigation(Binary"
+  ) +
+  theme_minimal()
+```
+
+
+since Irrigation status is a binary variable, we can clearly see how the sides of cutoff project that classification so for all units before the cutoff( below canal) they have been irrigated (therefore irrigation==1) and for all above the canal (after cutoff) they have not been irrigated(therefore irrigation==0)
+
+
+
+
+3D:
+```{r}
+##farmer's age
+ggplot(Part3, aes(x = distance_above_canal, y = age)) +
+  geom_point(color="green", alpha=0.8) +  # Add a plus sign here
+  geom_smooth() +
+  geom_vline(xintercept = 0, color = "pink", alpha=0.8, linetype = "dashed", size = 1.5) +
+  labs(title = "Smoothness Check on Farmer's Age (Balance Test/Parallel Trend)",
+       x = "Distance away from Canal (m)/Running Variable",
+       y = "Farmer's Age") +
+  theme_minimal()
+
+
+```
+
+
+```{r}
+#houshold size: 
+ggplot(Part3, aes(x = distance_above_canal, y = household_size)) +
+  geom_point(color="forestgreen", alpha=0.8) +
+  geom_smooth() +
+  geom_vline(xintercept = 0, color = "pink", alpha=0.8, linetype = "dashed", size = 1.5) +  
+  labs(title = "Smoothness Check on household size (Balance Test/Parallel Trend)",
+       x = "Distance away from Canal (m)/Running Variable",
+       y = "Household size") +
+  theme_minimal()
+```
+
+ 
+what the minister is asking form us is actually smoothness test. smoothness test looks at other characteristics of variables around the cutoff to make sure the jump/the difference before and after it is solely due to the treatment and not any underlying characteristics. the two smoothness tests abover furthur consolidate this idea that other than assignment to irrigation there is no fundamental difference between two groups( but we should keep in mind that one difference was wealth which we do not have any info on)
+
+
+3E:
+
+```{r}
+
+ggplot(Part3, aes(x = distance_above_canal)) +
+geom_histogram(binwidth = 1, fill = "yellow", alpha = 0.4) + #I tried different binwidths but only 1 shows the clear differenece around cutoff! ##this is "large binwidth"
+geom_vline(xintercept = 0, color = "pink", size=1.5, linetype = "dashed", label = "Cutoff") +
+labs(
+title = "Distribution of Distance Above Canal",
+x = "running variable(Distance away from canal(m))",
+y = "distribution"
+) +
+theme_minimal()
+```
+
+
+there is one important thing in RDD that we should check and that is the distribution of assignment to treatment around the cutoff. we need to see how the distances of yields who were just before and just around the cutoff so we can account for potential behavior modification by farmers:
+
+Ok so we might have a problem here!as I was expecting there seems to be a deliberate manipulation on farmer's end. those who are located right above the canal have somehow reported or changed the location of their farm so it falls under the treated ares(under canal).
+
+
+```{r}
+#the density plot: 
+ggplot(Part3, aes(x = distance_above_canal)) +
+  geom_density(fill = "lightblue", alpha = 0.7) +
+  geom_vline(xintercept = 0, color = "pink", linetype = "dashed", size=1.5) +
+  labs(
+    title = "Density of Farmers by Distance away from Canal",
+    x = "Distance away from Canal(m)",
+    y = "Density"
+  ) +
+  theme_minimal()
+```
+
+so now what we see is more or less the cumulative result of all the checks we did in the previous sections. although there is a sharp difference in density of farmers around the cutoff, we still are observing a continuous smooth line which indicates that the difference in Yield(kg/hectares) could be relevant to the irrigation treatment. still it owuld be amazing if the minister could ask for a data collection on distance from the river since that is one thing that effects the yield for sure (is in the error term) but we cannot include it in the model!
+
+
+
+##THE BONUS###
+
+I can't believe I am actually using this research but it was very lame that I couldn't help it:
+
+
+The Source: 
+Ely, A. V., Childress, A. R., Jagannathan, K., Lowe, M. R., & Kessler, R. M. (2015). Food and Romance: fMRI Aspects of the Brain and the Social/Emotional Environment. *Appetite*. Retrieved from [https://www.sciencedirect.com/science/article/abs/pii/S0195666315003153]
+(https://www.sciencedirect.com/science/article/abs/pii/S0195666315003153).(accessed May 20th, 2024)
+
+**Intro**
+The study involved 20 young women, half of whom had dieted before. Participants fasted for eight hours, viewed romantic and neutral images in an fMRI scan, drank a meal replacement, and were scanned again. The study found increased brain activity in response to romantic cues after eating, especially among past dieters.
+
+##ISSUES##
+**sample size**
+well, first the most basic problem is the sample size (20) which does not meet the basic condition of causal inference. 
+then 
+
+**randomization**
+there was no randomization and they only "recruited" people who were in their 20s, with very limited controlling factors which make the results even more unreliable. 
+
+
+This was a short paper with not enough regressions, ellaboratoins and details but the TIMES magazine had used it and it had gotten so much attention that I could not bleieve! so I used this to simply show has with obvious basic research issues people can make assumptions!!
+
+
+
+
